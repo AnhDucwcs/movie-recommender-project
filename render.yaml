@@ -1,0 +1,29 @@
+# render.yaml – Cấu hình triển khai tự động lên Render.com
+# Tài liệu: https://render.com/docs/blueprint-spec
+#
+# Cách dùng:
+#   1. Push repo lên GitHub
+#   2. Vào https://dashboard.render.com → New → Blueprint
+#   3. Chọn repo → Render tự đọc file này và deploy
+
+services:
+  - type: web
+    name: movie-recommender-backend
+    runtime: docker
+    # Dùng Dockerfile gốc (multi-stage: tự build model rồi chạy backend)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Render Free tier: 512MB RAM, sleep sau 15 phút không có request
+    plan: free
+    # Health check để Render biết service đã sẵn sàng
+    healthCheckPath: /api/health
+
+    envVars:
+      # TMDB_API_KEY: Bắt buộc điền thủ công trong Render Dashboard
+      # (sync: false = Render sẽ hỏi khi deploy lần đầu)
+      - key: TMDB_API_KEY
+        sync: false
+
+      # DATA_DIR đã được set sẵn trong Dockerfile, nhưng khai báo lại cho rõ
+      - key: DATA_DIR
+        value: /app/data

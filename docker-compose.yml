@@ -1,0 +1,57 @@
+services:
+  # ─────────────────────────────────────────────
+  # AI Engine — chạy một lần để build model
+  # Dùng: docker compose run --rm ai_engine
+  # ─────────────────────────────────────────────
+  ai_engine:
+    build:
+      context: ./ai_engine
+      dockerfile: Dockerfile
+    container_name: movie-recommender-ai
+    volumes:
+      # WORKDIR = /app/ai_engine, script dùng ../data → trỏ đúng /app/data
+      - ./data:/app/data
+    env_file:
+      - .env
+    profiles:
+      - tools   # Không tự chạy cùng `docker compose up`
+
+  # ─────────────────────────────────────────────
+  # Backend — FastAPI REST API
+  # ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: movie-recommender-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data (models + processed CSV) vào container tại /app/data
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      # Override DATA_DIR cho Docker (mặc định trong config.py là ../data cho local dev)
+      DATA_DIR: /app/data
+    restart: unless-stopped
+    # Chỉ khởi động sau khi ai_engine đã xuất model (tùy chọn)
+    # depends_on:
+    #   ai_engine:
+    #     condition: service_completed_successfully
+
+  # ─────────────────────────────────────────────
+  # Frontend — Next.js (chưa tạo, bật sau)
+  # ─────────────────────────────────────────────
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: movie-recommender-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://backend:8000
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
