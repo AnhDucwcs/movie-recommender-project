@@ -1,0 +1,22 @@
+# Bảo mật
+.env
+.env.*
+!.env.example
+
+# Bỏ qua thư mục chứa môi trường ảo
+venv/
+node_modules/
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+*$py.class
+.next/
+out/
+build/
+.DS_Store
+tempCodeRunnerFile.py
+
+# Bỏ qua các file data và model quá nặng (chỉ tải về máy cá nhân)
+data/raw/
+data/models/*.pkl
+
