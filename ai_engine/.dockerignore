@@ -1,0 +1,25 @@
+# Môi trường ảo
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Biến môi trường nhạy cảm
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Docker itself
+Dockerfile
+.dockerignore

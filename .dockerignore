@@ -1,0 +1,47 @@
+# ── Git ───────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Bảo mật ───────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python cache ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+ai_engine/*.ipynb
+
+# ── Data nặng (không cần trong image, Stage 1 chỉ cần processed/) ─────────
+data/raw/
+# *.pkl sẽ được TẠO trong Stage 1, không COPY vào – giữ nguyên để tránh nhầm
+data/models/
+
+# ── Frontend (chưa tạo) ───────────────────────────────────────────────────
+frontend/
+node_modules/
+.next/
+out/
+
+# ── IDE / OS ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Docker files khác (chỉ dùng Dockerfile gốc cho prod build) ────────────
+docker-compose.yml
+backend/Dockerfile
+backend/.dockerignore
+ai_engine/Dockerfile
+ai_engine/.dockerignore
+
+# ── Docs ──────────────────────────────────────────────────────────────────
+README.md
+*.md
