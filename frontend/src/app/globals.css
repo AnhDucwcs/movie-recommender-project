@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0f1425;
+  --bg-elev: #17203a;
+  --surface: #f6f2e8;
+  --text: #f6f5f2;
+  --text-dim: #bac3dc;
+  --accent: #ff7e38;
+  --accent-soft: #ffd79c;
+  --line: rgba(255, 255, 255, 0.14);
+  --font-body: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Bebas Neue", "Anton", "Arial Narrow", "Impact", sans-serif;
+}
+
+.app-shell {
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+  background:
+    radial-gradient(900px circle at 8% 0%, rgba(255, 126, 56, 0.24) 0%, transparent 40%),
+    radial-gradient(700px circle at 100% 12%, rgba(57, 132, 255, 0.26) 0%, transparent 38%),
+    linear-gradient(130deg, #0b1020 0%, #10172b 40%, #0f1425 100%);
+  min-height: 100vh;
+}
+
+.page-wrap {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.page-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.content-layer {
+  position: relative;
+  z-index: 1;
+}
+
+.title-display {
+  font-family: var(--font-heading), sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.glass-panel {
+  border: 1px solid var(--line);
+  background: linear-gradient(165deg, rgba(19, 28, 53, 0.8), rgba(19, 28, 53, 0.58));
+  box-shadow: 0 14px 40px rgba(4, 8, 20, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.search-shell {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(160deg, rgba(10, 18, 40, 0.88), rgba(20, 31, 59, 0.86));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 36px rgba(5, 10, 26, 0.36);
+}
+
+.search-command {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(160deg, rgba(18, 29, 56, 0.94), rgba(11, 19, 40, 0.95));
+}
+
+.suggestion-panel {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(13, 23, 48, 0.98) 0%, rgba(9, 17, 37, 0.98) 100%);
+  box-shadow: 0 24px 46px rgba(5, 10, 26, 0.48);
+}
+
+.suggestion-item {
+  transition: background 0.2s ease;
+}
+
+.suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hint-key {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.movie-card {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(250, 246, 234, 0.96) 0%, rgba(237, 231, 215, 0.93) 100%);
+  color: #1a1d27;
+  box-shadow: 0 20px 36px rgba(6, 12, 27, 0.22);
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+}
+
+.movie-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 30px 44px rgba(6, 12, 27, 0.3);
+}
+
+.poster-fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #1b2749 0%, #233564 52%, #32518f 100%);
+  color: var(--accent-soft);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .title-display {
+    letter-spacing: 0.02em;
+  }
+}
