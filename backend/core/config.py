@@ -14,6 +14,17 @@ class Settings(BaseSettings):
     # ── Cấu hình gợi ý ────────────────────────────────────────────────────────
     TOP_N_DEFAULT: int = 10
     TOP_N_MAX: int = 50
+    TRENDING_DEFAULT_LIMIT: int = 20
+    TRENDING_MAX_LIMIT: int = 50
+
+    # ── Dữ liệu trending từ MovieLens ratings.csv ────────────────────────────
+    # Nếu để rỗng, hệ thống tự dùng: {DATA_DIR}/raw/ml-latest-small/ratings.csv
+    RATINGS_CSV_PATH: str = ""
+    TRENDING_MIN_VOTES: int = 0
+
+    # ── Database ───────────────────────────────────────────────────────────────
+    DATABASE_URL: str = "sqlite:///./movie_recommender.db"
+    DB_ECHO: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

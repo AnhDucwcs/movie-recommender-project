@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router
+from db.init_db import create_tables
 from services.recommender import recommender_service
 
 
@@ -25,6 +26,7 @@ from services.recommender import recommender_service
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
     print("🚀 Khởi động Movie Recommender API...")
+    create_tables()
     recommender_service.load()
     yield
     # ── Shutdown ─────────────────────────────────────────────────────────────

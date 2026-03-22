@@ -1,5 +1,27 @@
 services:
   # ─────────────────────────────────────────────
+  # PostgreSQL — lưu users/interactions
+  # ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: movie-recommender-db
+    environment:
+      POSTGRES_USER: movieapp
+      POSTGRES_PASSWORD: movieapp
+      POSTGRES_DB: movie_recommender
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U movieapp -d movie_recommender"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
   # AI Engine — chạy một lần để build model
   # Dùng: docker compose run --rm ai_engine
   # ─────────────────────────────────────────────
@@ -34,6 +56,11 @@ services:
     environment:
       # Override DATA_DIR cho Docker (mặc định trong config.py là ../data cho local dev)
       DATA_DIR: /app/data
+      DATABASE_URL: postgresql+psycopg2://movieapp:movieapp@db:5432/movie_recommender
+      DB_ECHO: "false"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     # Chỉ khởi động sau khi ai_engine đã xuất model (tùy chọn)
     # depends_on:
@@ -55,3 +82,6 @@ services:
   #   depends_on:
   #     - backend
   #   restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -2,6 +2,12 @@
 
 Hệ thống gợi ý phim dựa trên **Content-Based Filtering** (TF-IDF + Cosine Similarity), kết hợp dữ liệu từ **MovieLens** và **TMDB API**.
 
+Phiên bản hiện tại hỗ trợ đầy đủ:
+- Item-to-Item recommendation theo `movie_id`
+- User-to-Item personalized recommendation theo lịch sử tương tác tích cực
+- Cold-start fallback cho user mới bằng danh sách Trending
+- Lưu tương tác người dùng vào PostgreSQL
+
 ## Cấu trúc dự án
 
 ```
@@ -23,11 +29,20 @@ movie-recommender-project/
 │   ├── Dockerfile
 │   ├── core/
 │   │   └── config.py               # Cấu hình app (đọc .env)
+│   ├── db/
+│   │   ├── models.py               # ORM: users, interactions
+│   │   ├── session.py              # SQLAlchemy session
+│   │   └── init_db.py              # Tạo bảng khi startup
 │   ├── services/
-│   │   └── recommender.py          # Load model, logic gợi ý
+│   │   └── recommender.py          # Load model + logic trending/recommendation
 │   └── api/
 │       └── routes.py               # Các endpoint REST
-├── frontend/                       # Giao diện web (Next.js) — chưa tạo
+├── frontend/                       # Giao diện web (Next.js)
+├── docker/
+│   └── postgres/
+│       └── init/
+│           ├── 01_schema.sql       # Schema khởi tạo DB
+│           └── 02_seed_sample_data.sql  # Dữ liệu mẫu cho demo/test
 ├── Dockerfile                      # Multi-stage build dùng để deploy cloud
 ├── docker-compose.yml              # Dùng để chạy local / Ubuntu
 ├── render.yaml                     # Cấu hình deploy lên Render.com
@@ -40,8 +55,9 @@ movie-recommender-project/
 | Tầng | Công nghệ |
 |------|-----------|
 | AI Engine | Python, Pandas, Scikit-learn, NLTK, TMDB API |
-| Backend | Python, FastAPI, Uvicorn |
-| Frontend | Next.js, React, TypeScript *(chưa tạo)* |
+| Backend | Python, FastAPI, Uvicorn, SQLAlchemy |
+| Frontend | Next.js, React, TypeScript |
+| Database | PostgreSQL (Docker), SQLite fallback |
 | Hạ tầng | Docker, Docker Compose |
 
 ## API Endpoints
@@ -49,9 +65,13 @@ movie-recommender-project/
 | Method | URL | Mô tả |
 |--------|-----|-------|
 | `GET` | `/api/health` | Trạng thái server và model |
+| `GET` | `/api/movies/trending?limit=` | Top phim thịnh hành từ `ratings.csv` |
 | `GET` | `/api/movies/search?q=&limit=` | Tìm kiếm phim theo tên |
 | `GET` | `/api/movies/{movie_id}` | Chi tiết một bộ phim |
-| `GET` | `/api/movies/{movie_id}/recommendations?n=` | Gợi ý Top-N phim tương tự |
+| `POST` | `/api/interactions` | Lưu tương tác người dùng (`LIKE`/`RATING`) |
+| `GET` | `/api/recommendations/movie/{movie_id}?n=` | Gợi ý phim tương tự (item-to-item) |
+| `GET` | `/api/recommendations/user/{user_id}?n=&history_limit=` | Gợi ý cá nhân hóa (user-to-item) |
+| `GET` | `/api/movies/{movie_id}/recommendations?n=` | Legacy endpoint tương thích frontend cũ |
 
 Xem tài liệu đầy đủ tại: `http://localhost:8000/docs`
 
@@ -91,6 +111,12 @@ nano .env
 ```
 TMDB_API_KEY=your_api_key_here
 DATA_DIR=../data
+RATINGS_CSV_PATH=
+TRENDING_DEFAULT_LIMIT=20
+TRENDING_MAX_LIMIT=50
+TRENDING_MIN_VOTES=0
+DATABASE_URL=sqlite:///./movie_recommender.db
+DB_ECHO=false
 ```
 
 ### Bước 4 — Tạo model AI *(chạy 1 lần duy nhất)*
@@ -103,20 +129,33 @@ Lệnh này sẽ tự động build model và lưu vào `data/models/`. Kiểm t
 
 ```bash
 ls data/models/
-# movie_dict.pkl  similarity.pkl
+# movie_dict.pkl  similarity.pkl  tfidf_vectorizer.pkl  tfidf_matrix.pkl
 ```
 
-### Bước 5 — Chạy Backend
+### Bước 5 — Khởi động Database + Backend
 
 ```bash
-# Chạy nền (khuyến nghị)
-docker compose up -d backend
+# Chạy DB trước (lần đầu sẽ tự chạy schema + seed trong docker/postgres/init)
+docker compose up -d db
 
-# Hoặc xem log trực tiếp
-docker compose up backend
+# Chạy backend
+docker compose up -d --build backend
+
+# (Tuỳ chọn) chạy cả DB + backend cùng lúc
+# docker compose up -d --build db backend
 ```
 
-### Bước 6 — Kiểm tra
+### Bước 6 — Chạy Frontend (tuỳ chọn)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend chạy tại `http://localhost:3001`.
+
+### Bước 7 — Kiểm tra
 
 ```bash
 curl http://localhost:8000/api/health
@@ -133,8 +172,14 @@ Hoặc mở trình duyệt: **`http://localhost:8000/docs`**
 # Xem log backend
 docker compose logs -f backend
 
+# Xem log database
+docker compose logs -f db
+
 # Dừng server
 docker compose down
+
+# Dừng và xoá volume DB (để seed chạy lại từ đầu)
+docker compose down -v
 
 # Rebuild image sau khi sửa code
 docker compose up -d --build backend
@@ -142,6 +187,24 @@ docker compose up -d --build backend
 # Tạo lại model từ đầu
 docker compose run --rm ai_engine
 ```
+
+---
+
+## Kịch bản AI Đã Xác Nhận
+
+### User 1 (Sci-fi fan, có điểm thấp cho Forrest Gump)
+- Lọc positive history bằng điều kiện: `interaction_type='LIKE' OR rating_value>=4`.
+- Phim `Forrest Gump (movieId=356, rating=2.0)` bị loại khỏi seed set.
+- Kết quả gợi ý trả về cụm Sci-fi/Space như các phần Star Wars khác, Alien, Interstellar, ...
+
+### User 2 (Romance + Animation)
+- Seed set chứa `Titanic`, `Toy Story`, `Toy Story 2`, `Beauty and the Beast`.
+- Kết quả nghiêng về cụm hoạt hình/tình cảm như `Toy Story 3`, `Pinocchio`, ...
+
+### User 3 (Cold-start)
+- Không có lịch sử tương tác.
+- API tự fallback sang strategy `cold_start_trending_fallback`.
+- Dữ liệu trả về lấy từ Top Trending tính trên `ratings.csv`.
 
 ---
 

@@ -44,13 +44,20 @@ def main():
     # 6. Xuất ra file .pkl vào đúng thư mục data/models/
     dict_path = os.path.join(model_dir, 'movie_dict.pkl')
     sim_path = os.path.join(model_dir, 'similarity.pkl')
+    vectorizer_path = os.path.join(model_dir, 'tfidf_vectorizer.pkl')
+    matrix_path = os.path.join(model_dir, 'tfidf_matrix.pkl')
 
     pickle.dump(movie_dict, open(dict_path, 'wb'))
     pickle.dump(cosine_sim, open(sim_path, 'wb'))
+    
+    pickle.dump(tfidf, open(vectorizer_path, 'wb'))
+    pickle.dump(tfidf_matrix, open(matrix_path, 'wb'))
 
     print(f"🎉 HOÀN TẤT! Các file đã được lưu an toàn tại:")
     print(f"   - {dict_path}")
     print(f"   - {sim_path}")
+    print(f"   - {vectorizer_path}")
+    print(f"   - {matrix_path}")
 
 if __name__ == "__main__":
     main()
