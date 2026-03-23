@@ -32,7 +32,6 @@ export default function HomePage() {
   const [trending, setTrending] = useState<TrendingMovie[]>([]);
   const [loadingTrending, setLoadingTrending] = useState(true);
   const [trendingError, setTrendingError] = useState("");
-  const [showAllTrending, setShowAllTrending] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -43,6 +42,7 @@ export default function HomePage() {
   const [loadingPersonalized, setLoadingPersonalized] = useState(false);
   const [personalizedError, setPersonalizedError] = useState("");
   const [personalizedStrategy, setPersonalizedStrategy] = useState("");
+  const [hasPersonalizedSeed, setHasPersonalizedSeed] = useState(false);
   const [interactionLoadingByMovie, setInteractionLoadingByMovie] = useState<Record<number, boolean>>({});
   const [likedByMovie, setLikedByMovie] = useState<Record<number, boolean>>({});
   const [interactionMessage, setInteractionMessage] = useState("");
@@ -165,6 +165,7 @@ export default function HomePage() {
       setPersonalizedItems([]);
       setPersonalizedError("");
       setPersonalizedStrategy("");
+      setHasPersonalizedSeed(false);
       return;
     }
 
@@ -178,11 +179,13 @@ export default function HomePage() {
         if (active) {
           setPersonalizedItems(data.recommendations);
           setPersonalizedStrategy(data.strategy);
+          setHasPersonalizedSeed(data.seed_movie_ids.length > 0);
         }
       } catch (err) {
         if (active) {
           setPersonalizedItems([]);
           setPersonalizedStrategy("");
+          setHasPersonalizedSeed(false);
           setPersonalizedError(err instanceof Error ? err.message : "Không tải được đề cử cá nhân hóa.");
         }
       } finally {
@@ -290,7 +293,7 @@ export default function HomePage() {
     }
     return b.interaction_count - a.interaction_count;
   });
-  const visibleTrending = topRatedTrending.slice(0, showAllTrending ? 50 : 20);
+  const visibleTrending = topRatedTrending.slice(0, 50);
 
   const formatRating = (score: number | null) => {
     if (score === null) {
@@ -377,6 +380,8 @@ export default function HomePage() {
     const left = edge === "start" ? 0 : ref.current.scrollWidth;
     ref.current.scrollTo({ left, behavior: "smooth" });
   };
+
+  const shouldShowPersonalizedSection = !!currentUser && (loadingPersonalized || hasPersonalizedSeed);
 
   return (
     <main className="page-wrap">
@@ -656,20 +661,9 @@ export default function HomePage() {
             </div>
           )}
 
-          {!loadingTrending && !trendingError && topRatedTrending.length > 20 ? (
-            <div className="mt-5 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowAllTrending((prev) => !prev)}
-                className="rounded-xl border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-              >
-                {showAllTrending ? "Thu gọn về Top 20" : "Xem thêm (đến 50 phim)"}
-              </button>
-            </div>
-          ) : null}
         </section>
 
-        {currentUser ? (
+        {shouldShowPersonalizedSection ? (
           <section className="mt-8 md:mt-10">
             <div className="mb-4 flex items-end justify-between gap-3">
               <h2 className="title-display text-3xl md:text-4xl">Đề Cử Cho Bạn</h2>

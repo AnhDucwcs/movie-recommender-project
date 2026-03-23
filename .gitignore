@@ -5,6 +5,9 @@
 
 # Bỏ qua thư mục chứa môi trường ảo
 venv/
+.venv/
+**/.venv/
+**/venv/
 node_modules/
 .ipynb_checkpoints/
 __pycache__/
