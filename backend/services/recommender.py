@@ -271,7 +271,7 @@ class RecommenderService:
     def get_recommendations(self, movie_id: int, n: int = 10) -> list[dict]:
         """
         Gợi ý Top-N phim tương tự dựa trên Cosine Similarity.
-        Mỗi item trả về MovieSummary + trường similarity_score [0, 1].
+        Mỗi item trả về MovieSummary + similarity_score + avg_score (nếu có).
         """
         if self._similarity is None:
             return []
@@ -288,10 +288,13 @@ class RecommenderService:
 
         results = []
         for list_idx, score in top:
-            item = self._summary_by_movie_id(int(self._movie_dict[list_idx]["movieId"]))
+            rec_movie_id = int(self._movie_dict[list_idx]["movieId"])
+            item = self._summary_by_movie_id(rec_movie_id)
             if item is None:
                 continue
+            stats = self._trending_stats.get(rec_movie_id, {"avg_score": None})
             item["similarity_score"] = round(float(score), 4)
+            item["avg_score"] = stats.get("avg_score")
             results.append(item)
         return results
 
@@ -311,11 +314,7 @@ class RecommenderService:
         Xếp hạng theo vote_count giảm dần, rồi avg_score giảm dần.
         """
         if not self._trending_ids:
-            fallback = self.search(query="", limit=limit)
-            for item in fallback:
-                item["interaction_count"] = 0
-                item["avg_score"] = None
-            return fallback
+            return []
 
         top_ids = self._trending_ids[:limit]
         movies = self.get_movie_summaries(top_ids)

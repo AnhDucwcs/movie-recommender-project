@@ -16,7 +16,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -34,14 +34,82 @@ class InteractionCreate(BaseModel):
     rating_value: float | None = Field(default=None, ge=1.0, le=5.0)
 
 
-def _get_trending_payload(limit: int) -> list[dict]:
+class InteractionTarget(BaseModel):
+    user_id: int = Field(..., ge=1)
+    movie_id: int = Field(..., ge=1)
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+def _get_db_movie_stats(db: Session, movie_ids: list[int]) -> dict[int, dict]:
+    """
+    Lấy thống kê interaction từ DB cho danh sách movie_ids.
+    """
+    if not movie_ids:
+        return {}
+
+    vote_count = func.count(Interaction.interaction_id).label("interaction_count")
+    avg_score = func.avg(Interaction.rating_value).label("avg_score")
+
+    stmt = (
+        select(Interaction.movie_id, vote_count, avg_score)
+        .where(Interaction.movie_id.in_(movie_ids))
+        .group_by(Interaction.movie_id)
+    )
+    rows = db.execute(stmt).all()
+
+    return {
+        int(row.movie_id): {
+            "interaction_count": int(row.interaction_count or 0),
+            "avg_score": round(float(row.avg_score), 2) if row.avg_score is not None else None,
+        }
+        for row in rows
+    }
+
+
+def _get_trending_payload(limit: int) -> tuple[list[dict], str]:
     """
     Xếp hạng trending theo ratings.csv (MovieLens).
     """
-    return recommender_service.get_trending_movies(limit=limit)
+    movies = recommender_service.get_trending_movies(limit=limit)
+    if movies:
+        return movies, "ratings_csv_vote_count_then_avg_score"
+    return [], "ratings_data_unavailable"
 
 
 # ─── Utility ─────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/auth/login",
+    tags=["Auth"],
+    summary="Đăng nhập người dùng",
+)
+async def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    """
+    Đăng nhập theo username + mật khẩu demo cấu hình trong env.
+    """
+    username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username không hợp lệ.")
+
+    user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu.")
+
+    if payload.password != settings.DEMO_LOGIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu.")
+
+    return {
+        "message": "Đăng nhập thành công",
+        "token": f"demo-token-{user.user_id}",
+        "user": {
+            "user_id": user.user_id,
+            "username": user.username,
+        },
+    }
 
 @router.get(
     "/health",
@@ -80,9 +148,17 @@ async def get_trending_movies(
     Trả về danh sách phim thịnh hành cho trang chủ người dùng mới.
     """
     _require_model()
-    movies = _get_trending_payload(limit=limit)
+    movies, strategy = _get_trending_payload(limit=limit)
+    if not movies:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Trending chỉ dùng dữ liệu rating nhưng hiện chưa có ratings.csv. "
+                "Hãy cung cấp RATINGS_CSV_PATH hoặc mount data/raw/ml-latest-small/ratings.csv"
+            ),
+        )
     return {
-        "strategy": "ratings_csv_vote_count_then_avg_score",
+        "strategy": strategy,
         "total": len(movies),
         "results": movies,
     }
@@ -164,6 +240,58 @@ async def create_interaction(
     if movie is None:
         raise HTTPException(status_code=404, detail=f"Không tìm thấy movie_id = {payload.movie_id}")
 
+    if interaction_type == "RATING":
+        latest_rating = db.execute(
+            select(Interaction)
+            .where(
+                Interaction.user_id == payload.user_id,
+                Interaction.movie_id == payload.movie_id,
+                Interaction.interaction_type == "RATING",
+            )
+            .order_by(desc(Interaction.created_at), desc(Interaction.interaction_id))
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if latest_rating is not None:
+            latest_rating.rating_value = rating_value
+            db.commit()
+            db.refresh(latest_rating)
+            return {
+                "message": "Đã cập nhật rating thành công",
+                "interaction": {
+                    "interaction_id": latest_rating.interaction_id,
+                    "user_id": latest_rating.user_id,
+                    "movie_id": latest_rating.movie_id,
+                    "interaction_type": latest_rating.interaction_type,
+                    "rating_value": latest_rating.rating_value,
+                    "created_at": latest_rating.created_at,
+                },
+            }
+
+    if interaction_type == "LIKE":
+        existing_like = db.execute(
+            select(Interaction)
+            .where(
+                Interaction.user_id == payload.user_id,
+                Interaction.movie_id == payload.movie_id,
+                Interaction.interaction_type == "LIKE",
+            )
+            .order_by(desc(Interaction.created_at), desc(Interaction.interaction_id))
+            .limit(1)
+        ).scalar_one_or_none()
+        if existing_like is not None:
+            return {
+                "message": "Phim đã được Like trước đó",
+                "interaction": {
+                    "interaction_id": existing_like.interaction_id,
+                    "user_id": existing_like.user_id,
+                    "movie_id": existing_like.movie_id,
+                    "interaction_type": existing_like.interaction_type,
+                    "rating_value": existing_like.rating_value,
+                    "created_at": existing_like.created_at,
+                },
+            }
+
     interaction = Interaction(
         user_id=payload.user_id,
         movie_id=payload.movie_id,
@@ -188,6 +316,83 @@ async def create_interaction(
 
 
 @router.get(
+    "/interactions/status",
+    tags=["Interactions"],
+    summary="Lấy trạng thái tương tác user với movie",
+)
+async def get_interaction_status(
+    user_id: int = Query(..., ge=1),
+    movie_id: int = Query(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy user_id = {user_id}")
+
+    liked = db.execute(
+        select(Interaction.interaction_id)
+        .where(
+            Interaction.user_id == user_id,
+            Interaction.movie_id == movie_id,
+            Interaction.interaction_type == "LIKE",
+        )
+        .order_by(desc(Interaction.created_at), desc(Interaction.interaction_id))
+        .limit(1)
+    ).scalar_one_or_none()
+
+    latest_rating = db.execute(
+        select(Interaction.rating_value)
+        .where(
+            Interaction.user_id == user_id,
+            Interaction.movie_id == movie_id,
+            Interaction.interaction_type == "RATING",
+        )
+        .order_by(desc(Interaction.created_at), desc(Interaction.interaction_id))
+        .limit(1)
+    ).scalar_one_or_none()
+
+    return {
+        "user_id": user_id,
+        "movie_id": movie_id,
+        "liked": liked is not None,
+        "latest_rating": float(latest_rating) if latest_rating is not None else None,
+    }
+
+
+@router.delete(
+    "/interactions/like",
+    tags=["Interactions"],
+    summary="Hủy Like phim",
+)
+async def unlike_movie(
+    payload: InteractionTarget,
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, payload.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy user_id = {payload.user_id}")
+
+    like_rows = db.execute(
+        select(Interaction)
+        .where(
+            Interaction.user_id == payload.user_id,
+            Interaction.movie_id == payload.movie_id,
+            Interaction.interaction_type == "LIKE",
+        )
+    ).scalars().all()
+
+    if not like_rows:
+        return {"message": "Phim chưa được Like", "deleted": 0}
+
+    deleted_count = len(like_rows)
+    for row in like_rows:
+        db.delete(row)
+    db.commit()
+
+    return {"message": "Đã hủy Like thành công", "deleted": deleted_count}
+
+
+@router.get(
     "/recommendations/movie/{movie_id}",
     tags=["Recommendations"],
     summary="Gợi ý phim tương tự theo movie_id (item-to-item)",
@@ -200,6 +405,7 @@ async def get_movie_recommendations(
         le=settings.TOP_N_MAX,
         description="Số lượng phim gợi ý",
     ),
+    db: Session = Depends(get_db),
 ):
     """
     Trả về danh sách **Top-N phim tương tự** dựa trên thuật toán
@@ -231,6 +437,20 @@ async def get_movie_recommendations(
         )
 
     recommendations = recommender_service.get_recommendations(movie_id, n=n)
+    missing_rating_movie_ids = [
+        int(item["movieId"])
+        for item in recommendations
+        if item.get("avg_score") is None
+    ]
+    if missing_rating_movie_ids:
+        db_stats = _get_db_movie_stats(db=db, movie_ids=missing_rating_movie_ids)
+        for item in recommendations:
+            if item.get("avg_score") is not None:
+                continue
+            stats = db_stats.get(int(item["movieId"]))
+            if stats is not None:
+                item["avg_score"] = stats["avg_score"]
+
     return {
         "strategy": "item_to_item_cosine_similarity",
         "movie": movie,
@@ -293,10 +513,15 @@ async def get_user_recommendations(
         seed_movie_ids.append(movie_id)
 
     if not seed_movie_ids:
-        trending = _get_trending_payload(limit=n)
+        trending, strategy = _get_trending_payload(limit=n)
+        if not trending:
+            raise HTTPException(
+                status_code=503,
+                detail="Không thể fallback trending vì thiếu dữ liệu rating (ratings.csv).",
+            )
         return {
             "user_id": user_id,
-            "strategy": "cold_start_trending_fallback",
+            "strategy": f"cold_start_trending_fallback::{strategy}",
             "seed_movie_ids": [],
             "recommendations": trending,
         }
@@ -307,10 +532,15 @@ async def get_user_recommendations(
     )
 
     if not recommendations:
-        trending = _get_trending_payload(limit=n)
+        trending, strategy = _get_trending_payload(limit=n)
+        if not trending:
+            raise HTTPException(
+                status_code=503,
+                detail="Không thể fallback trending vì thiếu dữ liệu rating (ratings.csv).",
+            )
         return {
             "user_id": user_id,
-            "strategy": "personalized_unavailable_then_trending",
+            "strategy": f"personalized_unavailable_then_trending::{strategy}",
             "seed_movie_ids": seed_movie_ids,
             "recommendations": trending,
         }
@@ -332,8 +562,9 @@ async def get_user_recommendations(
 async def get_movie_recommendations_legacy(
     movie_id: int,
     n: int = Query(default=10, ge=1, le=settings.TOP_N_MAX),
+    db: Session = Depends(get_db),
 ):
-    return await get_movie_recommendations(movie_id=movie_id, n=n)
+    return await get_movie_recommendations(movie_id=movie_id, n=n, db=db)
 
 
 # ─── Internal helper ─────────────────────────────────────────────────────────
