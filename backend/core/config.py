@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./movie_recommender.db"
     DB_ECHO: bool = False
 
+    # ── Auth demo ──────────────────────────────────────────────────────────────
+    # Vì bảng users hiện chưa lưu password hash, login API dùng mật khẩu demo chung.
+    DEMO_LOGIN_PASSWORD: str = "movie123"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

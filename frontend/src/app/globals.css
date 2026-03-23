@@ -102,6 +102,44 @@
   box-shadow: 0 30px 44px rgba(6, 12, 27, 0.3);
 }
 
+.movie-carousel {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scroll-snap-type: x mandatory;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.movie-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.movie-carousel-item {
+  flex: 0 0 calc((100% - 1rem) / 2);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 768px) {
+  .movie-carousel-item {
+    flex-basis: calc((100% - 2rem) / 3);
+  }
+}
+
+@media (min-width: 1024px) {
+  .movie-carousel-item {
+    flex-basis: calc((100% - 3rem) / 4);
+  }
+}
+
+@media (min-width: 1280px) {
+  .movie-carousel-item {
+    flex-basis: calc((100% - 4rem) / 5);
+  }
+}
+
 .poster-fallback {
   display: grid;
   place-items: center;
