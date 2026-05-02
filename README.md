@@ -224,13 +224,13 @@ docker compose run --rm ai_engine
 - [x] `requirements.txt` — Khai báo fastapi, uvicorn, scikit-learn, pandas
 
 ### Frontend
-- [ ] Khởi tạo project Next.js (App Router)
-- [ ] `app/page.tsx` — Trang chủ hiển thị phim phổ biến
-- [ ] `app/movies/[id]/page.tsx` — Trang chi tiết phim & danh sách gợi ý
-- [ ] `components/MovieCard.tsx` — Component hiển thị poster phim
-- [ ] `components/SearchBar.tsx` — Thanh tìm kiếm phim
-- [ ] `components/Navbar.tsx` — Thanh điều hướng
-- [ ] `lib/api.ts` — Hàm gọi API tới backend
+- [x] Khởi tạo project Next.js (App Router)
+- [x] `app/page.tsx` — Trang chủ hiển thị phim phổ biến, tìm kiếm và trending
+- [x] `app/movies/[id]/page.tsx` — Trang chi tiết phim & danh sách gợi ý
+- [x] `app/movies/[id]/movie-interaction-panel.tsx` — Khu vực tương tác người dùng với phim
+- [x] `components/movie-interaction-panel.tsx` — Component dùng lại cho phần tương tác
+- [x] `app/layout.tsx` — Layout gốc và metadata của ứng dụng
+- [x] `lib/api.ts` — Hàm gọi API tới backend
 
 ### DevOps / Hạ tầng
 - [x] `docker-compose.yml` — Chạy local / Ubuntu
